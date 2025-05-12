@@ -1,40 +1,36 @@
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
+const userSockets = new Map(); // username => socketId
 
-const app = express();
-const server = http.createServer(app);
+export const registerSocketHandlers = (io) => {
+  io.on('connection', (socket) => {
+    console.log('🟢 New socket connected:', socket.id);
 
-app.use(cors());
-app.use(express.json());
+    socket.on('register', (username) => {
+      userSockets.set(username, socket.id);
+      console.log(`✅ Registered ${username} with socket ID: ${socket.id}`);
+    });
 
-// Optional health check
-app.get('/', (req, res) => {
-  res.send('✅ Socket.IO server is running');
-});
+    socket.on('private_message', ({ sender, receiver, text }) => {
+      const targetSocketId = userSockets.get(receiver);
 
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-});
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('private_message', { sender, receiver, text });
+        console.log(`📩 ${sender} ➡️ ${receiver}: ${text}`);
+      } else {
+        console.log(`❌ ${receiver} not connected`);
+      }
 
-io.on('connection', (socket) => {
-  console.log('🟢 A user connected:', socket.id);
+      // Echo to sender as confirmation
+      socket.emit('private_message', { sender, receiver, text });
+    });
 
-  socket.on('chat message', (msg) => {
-    console.log('📨 Message received:', msg);
-    io.emit('chat message', msg);
+    socket.on('disconnect', () => {
+      for (const [user, id] of userSockets.entries()) {
+        if (id === socket.id) {
+          userSockets.delete(user);
+          console.log(`🔴 ${user} disconnected`);
+          break;
+        }
+      }
+    });
   });
-
-  socket.on('disconnect', () => {
-    console.log('🔴 A user disconnected:', socket.id);
-  });
-});
-
-const PORT = 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-});
+};
