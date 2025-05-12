@@ -2,10 +2,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { users } from '../users.js';
 
-const JWT_SECRET = 'your_secret_key'; // use env in production
+const JWT_SECRET = 'your_secret_key'; // Use env var in prod
 
 export const registerUser = async (req, res) => {
   const { email, username, password } = req.body;
+  console.log("here", req.body)
 
   const existing = users.find(u => u.email === email);
   if (existing) return res.status(400).json({ message: 'Email already registered' });
